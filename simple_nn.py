@@ -16,22 +16,27 @@ data = pd.read_csv("winequality-red.csv")
 X = data.drop("quality", axis=1).values
 y = data["quality"].values
 
-# Split into training and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+# Split into training, validation, and test sets (70% train, 15% validation, 15% test)
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.3, random_state=42)
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
 
 # Scale the features
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
+X_val_scaled = scaler.transform(X_val)
 X_test_scaled = scaler.transform(X_test)
 
 # Convert target labels to zero-based indices
 y_train = y_train - y_train.min()
+y_val = y_val - y_val.min()
 y_test = y_test - y_test.min()
 
 # Convert data to PyTorch tensors
 X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
+X_val_tensor = torch.tensor(X_val_scaled, dtype=torch.float32)
 X_test_tensor = torch.tensor(X_test_scaled, dtype=torch.float32)
 y_train_tensor = torch.tensor(y_train, dtype=torch.long)
+y_val_tensor = torch.tensor(y_val, dtype=torch.long)
 y_test_tensor = torch.tensor(y_test, dtype=torch.long)
 
 # Define the neural network
@@ -78,6 +83,10 @@ batch_size = 32  # Mini-batch size
 train_dataset = torch.utils.data.TensorDataset(X_train_tensor, y_train_tensor)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
+# Validation loop
+val_dataset = torch.utils.data.TensorDataset(X_val_tensor, y_val_tensor)
+val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
 for epoch in range(num_epochs):
     model.train()  # Set model to training mode
     epoch_loss = 0
@@ -96,11 +105,27 @@ for epoch in range(num_epochs):
     # Step the scheduler
     scheduler.step()
 
-    # Print loss every 50 epochs
-    if (epoch + 1) % 25 == 0:
-        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss / len(train_loader):.4f}")
+    # Validate the model after each epoch
+    model.eval()  # Set model to evaluation mode
+    val_loss = 0
+    val_correct = 0
+    val_total = 0
+    with torch.no_grad():
+        for batch_X, batch_y in val_loader:
+            outputs = model(batch_X)
+            _, predicted = torch.max(outputs, 1)
+            loss = criterion(outputs, batch_y)
 
-# Evaluate the model
+            val_loss += loss.item()
+            val_correct += (predicted == batch_y).sum().item()
+            val_total += batch_y.size(0)
+
+    val_accuracy = val_correct / val_total
+    print(f"Epoch [{epoch + 1}/{num_epochs}], Training Loss: {epoch_loss / len(train_loader):.4f}, Validation Loss: {val_loss / len(val_loader):.4f}, Validation Accuracy: {val_accuracy:.4f}")
+
+    # Early stopping or other conditions can be added based on validation performance here
+
+# Evaluate the model on the test set
 model.eval()  # Set model to evaluation mode
 with torch.no_grad():
     outputs = model(X_test_tensor)  # Forward pass
@@ -109,9 +134,9 @@ with torch.no_grad():
 
 # Performance metrics
 accuracy = accuracy_score(y_test, y_pred)
-print(f"Accuracy: {accuracy:.2f}")
-print("Classification Report:\n", classification_report(y_test, y_pred, zero_division=0))
-print("Confusion Matrix:")
+print(f"Test Accuracy: {accuracy:.2f}")
+print("Test Classification Report:\n", classification_report(y_test, y_pred, zero_division=0))
+print("Test Confusion Matrix:")
 print(confusion_matrix(y_test, y_pred))
 
 # Plot confusion matrix
@@ -122,4 +147,3 @@ plt.title("Confusion Matrix")
 plt.xlabel("Predicted Labels")
 plt.ylabel("True Labels")
 plt.show()
-
