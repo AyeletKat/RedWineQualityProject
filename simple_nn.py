@@ -56,7 +56,7 @@ class ImprovedNN(nn.Module):
 
 # Model parameters
 input_size = X_train.shape[1]
-hidden_size = 32  # Increased hidden size for better capacity
+hidden_size = 300  # Increased hidden size for better capacity
 num_classes = len(np.unique(y))
 
 # Initialize the model, loss function, and optimizer
@@ -73,7 +73,7 @@ optimizer = optim.AdamW(model.parameters(), lr=0.01, weight_decay=1e-4)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)  # Reduce LR every 20 epochs
 
 # Training loop
-num_epochs = 500
+num_epochs = 200
 batch_size = 32  # Mini-batch size
 train_dataset = torch.utils.data.TensorDataset(X_train_tensor, y_train_tensor)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -97,7 +97,7 @@ for epoch in range(num_epochs):
     scheduler.step()
 
     # Print loss every 50 epochs
-    if (epoch + 1) % 50 == 0:
+    if (epoch + 1) % 25 == 0:
         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss / len(train_loader):.4f}")
 
 # Evaluate the model
